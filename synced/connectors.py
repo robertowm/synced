@@ -1,19 +1,21 @@
 import abc
+import json, copy, six
+from types import *
+import uuid, time_uuid
+from datetime import datetime
+
 from cassandra.cluster import Cluster
 from cassandra.query import dict_factory
-from elasticsearch import Elasticsearch
+from pyes import ES
+from pyes.query import *
 
 
 class Connector(object):
     __metaclass__ = abc.ABCMeta
 
-    def list_tables(self):
-        """List tables name."""
-        return
-
     @abc.abstractmethod
-    def load(self, table, begin, end):
-        """Retrieve data from the input source and return it."""
+    def load(self, begin, end):
+        """Retrieve data from the input sources and return it."""
         return
 
     @abc.abstractmethod
@@ -27,8 +29,7 @@ class Connector(object):
         return
 
 
-class CassandraConnector(Connector):
-
+class CassandraConnector:
     def __init__(self, keyspace):
         self.keyspace = keyspace
         self.cluster = Cluster()
@@ -48,6 +49,11 @@ class CassandraConnector(Connector):
         bound_stmt = prepared_stmt.bind([begin, end])
         return self.session.execute(bound_stmt)
 
+    def load(self, begin, end):
+        for table in self.list_tables():
+            for row in self.load(table, begin, end):
+                yield row
+
     def upsert(self, table, data):
         prepared_stmt = self.session.prepare("INSERT INTO " + table + " (" +
                                              ", ".join(key for key in data) +
@@ -62,16 +68,48 @@ class CassandraConnector(Connector):
         self.session.shutdown()
 
 
-class ESConnector(Connector):
+class ESConnector:
+    def __init__(self, index_name):
+        self.client = ES('localhost:9200')
+        self.indexName = index_name
 
-    def __init__(self):
-        self.client = Elasticsearch()
+    def serialize(self, value):
+        if type(value) is dict:
+            _value = {}
+            for key in value:
+                _value[key] = self.serialize(value[key])
+            return _value
+        elif isinstance(value, six.integer_types):
+            return str(value)
+        elif isinstance(value, six.string_types) or isinstance(value, six.text_type):
+            return '"' + value + '"'
+        elif isinstance(value, uuid.UUID):
+            return '"' + time_uuid.TimeUUID.convert(value).get_datetime().isoformat() + '"'
+        elif isinstance(value, time_uuid.TimeUUID):
+            return '"' + value.get_datetime().isoformat() + '"'
+        elif isinstance(value, datetime):
+            return '"' + value.isoformat() + '"'
+        else:
+            return str(value)
 
-    def list_tables(self):
-        pass
-
-    def load(self, table, begin, end):
-        pass
+    def load(self, begin, end):
+        string_query = "tmstmp: [" + self.serialize(begin) + " TO " + self.serialize(end) + "]"
+        return self.client.search(query=QueryStringQuery(string_query), indices=self.indexName)
 
     def upsert(self, table, data):
+        _data = self.serialize(data)
+        script_data = ";".join( "ctx._source." + key + "=" + value
+                        for key, value in _data.iteritems()) + ";"
+        script = "if(ctx._source.tmstmp>="+_data['tmstmp']+"){ctx.op=\"noop\";}else{"+script_data+"}"
+        params = upsert = _data
+        return self.client.update(
+            index=self.indexName,
+            doc_type=table,
+            id=_data['id'],
+            script=script,
+            params=params,
+            upsert=upsert,
+            lang='groovy')
+
+    def close(self):
         pass
