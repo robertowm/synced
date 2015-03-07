@@ -8,14 +8,20 @@ from cassandra.cluster import Cluster
 from cassandra.query import dict_factory
 from pyes import ES
 from pyes.query import *
+from pyes.managers import Indices
 
 
 class Connector(object):
     __metaclass__ = abc.ABCMeta
 
     @abc.abstractmethod
-    def load(self, begin, end):
-        """Retrieve data from the input sources and return it."""
+    def list_tables(self):
+        """List all available tables."""
+        return
+
+    @abc.abstractmethod
+    def load(self, table, begin, end):
+        """Retrieve data from the input source and return it."""
         return
 
     @abc.abstractmethod
@@ -29,15 +35,12 @@ class Connector(object):
         return
 
 
-class CassandraConnector:
+class CassandraConnector(Connector):
     def __init__(self, keyspace):
         self.keyspace = keyspace
         self.cluster = Cluster()
         self.session = self.cluster.connect(keyspace=keyspace)
         self.session.row_factory = dict_factory
-
-    def session(self):
-        return self.session
 
     def list_tables(self):
         return [name for name in self.cluster.metadata.keyspaces[self.keyspace].tables];
@@ -48,11 +51,6 @@ class CassandraConnector:
                                              " ALLOW FILTERING;")
         bound_stmt = prepared_stmt.bind([begin, end])
         return self.session.execute(bound_stmt)
-
-    def load(self, begin, end):
-        for table in self.list_tables():
-            for row in self.load(table, begin, end):
-                yield row
 
     def upsert(self, table, data):
         prepared_stmt = self.session.prepare("INSERT INTO " + table + " (" +
@@ -92,9 +90,12 @@ class ESConnector:
         else:
             return str(value)
 
-    def load(self, begin, end):
+    def list_tables(self):
+        return [k for (k, v) in Indices(self.client).get_mapping(indices=self.indexName).indices[self.indexName]]
+
+    def load(self, table, begin, end):
         string_query = "tmstmp: [" + self.serialize(begin) + " TO " + self.serialize(end) + "]"
-        return self.client.search(query=QueryStringQuery(string_query), indices=self.indexName)
+        return self.client.search(query=QueryStringQuery(string_query), indices=self.indexName, doc_types=table)
 
     def upsert(self, table, data):
         _data = self.serialize(data)
