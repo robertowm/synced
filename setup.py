@@ -10,7 +10,7 @@ config = {
     'download_url': 'Where to download it.',
     'author_email': 'robertowm (at) gmail (dot) com',
     'version': '0.1',
-    'install_requires': ['nose'],
+    'install_requires': ['nose', 'pyes', 'cassandra-driver'],
     'packages': ['synced'],
     'scripts': [],
     'name': 'synced'
