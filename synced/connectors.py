@@ -1,19 +1,17 @@
 import abc
-import json
-import copy
-import six
 import re
 from collections import OrderedDict
-from types import *
 import uuid
-import time_uuid
 from datetime import datetime
+
+import time_uuid
 from cassandra.cluster import Cluster
 from cassandra.query import dict_factory
 from pyes import ES
 from pyes.query import *
 from pyes.managers import Indices
 from dateutil.parser import parse
+
 
 class Connector(object):
     __metaclass__ = abc.ABCMeta
@@ -58,9 +56,9 @@ class CassandraConnector(Connector):
 
     def normalize(self, data):
         def normalize_entry(key, value):
-            if key == u'id' and isinstance(value, uuid.UUID):
+            if key == u"id" and isinstance(value, uuid.UUID):
                 return str(value)
-            elif key == u'tmstmp':
+            elif key == u"tmstmp":
                 if not isinstance(value, time_uuid.TimeUUID):
                     return time_uuid.TimeUUID.convert(value, randomize=False, lowest_val=True).get_datetime()
                 else:
@@ -72,9 +70,9 @@ class CassandraConnector(Connector):
 
     def convert(self, data):
         def convert_entry(key, value):
-            if key == 'id':
+            if key == "id":
                 return value if isinstance(value, uuid.UUID) else uuid.UUID(value)
-            elif key == 'tmstmp' and isinstance(value, datetime):
+            elif key == "tmstmp" and isinstance(value, datetime):
                 return uuid.UUID(str(time_uuid.TimeUUID.convert(value, randomize=False, lowest_val=True)))
             else:
                 return value
@@ -109,7 +107,7 @@ class CassandraConnector(Connector):
 
 class ESConnector(Connector):
     def __init__(self, index_name):
-        self.client = ES('localhost:9200')
+        self.client = ES("localhost:9200")
         self.indexName = index_name
 
     def normalize(self, data):
@@ -151,14 +149,14 @@ class ESConnector(Connector):
         _data = self.convert(data)
         script_data = ";".join("ctx._source." + key + "=" + value
                                for key, value in _data.iteritems()) + ";"
-        script = "if(ctx._source.tmstmp>="+_data['tmstmp']+"){ctx.op=\"noop\";}else{"+script_data+"}"
+        script = "if(ctx._source.tmstmp>="+_data["tmstmp"]+"){ctx.op=\"noop\";}else{"+script_data+"}"
         return self.client.update(
             index=self.indexName,
             doc_type=table,
-            id=data['id'],
+            id=data["id"],
             script=script,
             upsert=data,
-            lang='groovy')
+            lang="groovy")
 
     def close(self):
         pass

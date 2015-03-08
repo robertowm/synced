@@ -1,23 +1,24 @@
-#!/usr/bin/python
-
 import sys
 import getopt
 from os import path
 from datetime import datetime
 import synced
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def load_params(argv):
     begin = end = -1
-    keyspace = indexname = ''
+    keyspace = indexname = ""
     try:
         opts, args = getopt.getopt(argv, "hbek:i:", ["begin=", "end=", "keyspace", "indexname"])
     except getopt.GetoptError:
-        print 'synced -b <begin> -e <end> -k <keyspace> -i <indexname>'
+        print "synced -b <begin> -e <end> -k <keyspace> -i <indexname>"
         sys.exit(2)
     for opt, arg in opts:
-        if opt == '-h':
-            print 'synced -b <begin> -e <end> -k <keyspace> -i <indexname>'
+        if opt == "-h":
+            print "synced -b <begin> -e <end> -k <keyspace> -i <indexname>"
             sys.exit()
         elif opt in ("-b", "--begin"):
             begin = float(arg)
@@ -46,17 +47,25 @@ def load_params(argv):
 
 
 def main():
-    print 'Synced starting...'
-    print '(1) Load params...'
-    begin, end, keyspace, indexname = load_params(sys.argv[1:])
-    print 'begin:', begin, '\nend:', end, '\nkeyspace:', keyspace, '\nindexname:', indexname
-    print 'Done.\n(2) Syncing...'
-    synced.sync(begin, end, keyspace, indexname)
-    print 'Done.\n(3) Saving end interval...'
-    with open("last", "w") as f:
-        f.write(str((end - datetime.utcfromtimestamp(0)).total_seconds()))
-    print 'Done.\nBye bye!'
+    logger.info("Starting sync process..")
+    try:
+        logger.debug("(1) Load params...")
+        begin, end, keyspace, indexname = load_params(sys.argv[1:])
+        logger.debug("(1.1) begin: %s", begin)
+        logger.debug("(1.2) end: %s", end)
+        logger.debug("(1.3) keyspace: %s", keyspace)
+        logger.debug("(1.4) indexname: %s", indexname)
+        logger.debug("(2) Syncing...")
+        synced.sync(begin, end, keyspace, indexname)
+        logger.debug("(3) Saving end interval...")
+        with open("last", "w") as f:
+            f.write(str((end - datetime.utcfromtimestamp(0)).total_seconds()))
+        logger.info("Databases synchronized.")
+        return 0
+    except Exception, e:
+        logging.exception(e)
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
