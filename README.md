@@ -80,9 +80,11 @@ We use the file called *last* to persist the end of the range of the last execut
 Just use crontab :)  In this case, use the [sync.py](https://github.com/robertowm/synced/blob/master/sync.py) to configure the crontab properly. [Need help? Click here.](https://help.ubuntu.com/community/CronHowto)
 
 Question:  But I use Windows...  Can you help me?
+
 Answer:  [Sure.  One of many solutions.](http://www.ubuntu.com/download)
 
 Question:  But I really need a "daemon" solution with a scheduler in Python.  Can you?
+
 Answer:  I'm thinking in doing something like that for learning purpose.  In the meanwhile, you can use this [great article](http://simeonfranklin.com/blog/2012/aug/14/scheduling-tasks-python/) as a workaround.
 
 ## Limitations / Future work
