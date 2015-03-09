@@ -33,6 +33,8 @@ def sync(source, target, begin, end):
       target.upsert_if_newer(entry)
 ```
 
+Also, all data is normalized after loaded and converted again before the upsert.  It is important to simplify datatype equivalence between databases, i.e., field **tmstmp** is **time_uuid** in Cassandra and **date** in ES that it is normalized to a python **datetime** and treated properly by each database connector.
+
 ## Why this solution works?
 
 This solution is based on upserts, that only occurs if the given timestamp is newer that the persisted version.  This operation is a atomic operation, so concurrent access isn't a problem.  Also, we sync a well-defined range, preventing that new entries interfere in the current execution.  
